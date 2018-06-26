@@ -27,26 +27,32 @@ char * readln(I_FILE * file) {
 //выделение памяти под переменные
 void realloc_x(O_X * x, long int index) {
     if (x->length <= index) {
-        x->x = realloc(x->x, sizeof(x->x) + (sizeof(long long) * (index + 1 - x->length)));
+        x->x = realloc(x->x, sizeof(long long) * (index + 1));
+        long i;
+        for (i = x ->length; i <= index; i++) {
+            x -> x[i] = 0;
+        }
         x->length = index + 1;
     }
 }
 //скипаем пробелы
 int s_s(char * string, int from) {
     for (int i = from; i < strlen(string); ++i) {
-        if (string[i] != ' ' && string[i] != '\t' && string[i] != '\n' && string[i] != 'v'
+        if (string[i] != ' ' && string[i] != '\t' && string[i] != '\n' && string[i] != '\v'
             && string[i] != '\f' && string[i] != '\r')
             return i;
     }
     return -1;
 }
-
+//математические операции
 void math(O_X * x, char * _line) {
+
     char * line = malloc(strlen(_line) * sizeof(char));
+    //копируем строку
     strcpy(line, _line);
     line += s_s(line, 0);
     if (*line != 'x')
-        return;
+        return; //TODO вывести ошибку
     line++; //сдвигаем указатель
     //Читаем, с какой переменной работаем
     long int index = strtol(line, &line, 10);
@@ -55,7 +61,7 @@ void math(O_X * x, char * _line) {
     line++; //Снова сдвигаем указатель
     //Проверяем знак присваивания
     if (*(line)++ != ':' || *(line)++ != '=')
-        return;
+        return; //TODO вывести ошибку
     line++; //И опять сдвигаем указатель
     long long value_a;
     //Если это другая переменная
@@ -71,18 +77,18 @@ void math(O_X * x, char * _line) {
         value_a = strtol(line, &line, 10);
     }
     long long value_b = 0;
-    int sum = 1;
+    int sum = 1; //по нему определяем какой знак операции
     //Выражение могло закончится всего на одном слагаемом, так что проверяем наличие второго
-    if (*line != '\0') {
+    if (*line != '\0' && *line != ';' && *line != '\r') {
         line++; //Да сколько можно их сдвигать?
         if (*line == '+') {
             sum = 1;
         } else if (*line == '-') {
             sum = -1;
         } else {
-            return;
+            return; //TODO вывести ошибку
         }
-        line+=2; //Остановись!
+        line+=2; //Остановись! сразу + и пробел
         if (*line == 'x') {
             line++;
             long int index_b = strtol(line, &line, 10);
@@ -107,6 +113,7 @@ int loop(O_X * x, char ** lines, int l_index) {
     char * line = malloc(strlen(lines[l_index]) * sizeof(char));
     strcpy(line, lines[l_index]);
     line += s_s(line, 0);
+    //проверим слово loop
     if (*(line)++ != 'L' || *(line)++ != 'O' || *(line)++ != 'O' || *(line)++ != 'P')
         return -1;
     line++; //again..
@@ -117,23 +124,27 @@ int loop(O_X * x, char ** lines, int l_index) {
         if (index >= x->length)
             count = 0; //Переменная не используется -> равна 0
         else
-            count = x->x[index];
-        //Если константа
+            count = x->x[index]; //переменная была использована ранее, берем ее значение по индексу
+        //Если константа (а может так нельзя)
     } else {
-        count = strtol(line, &line, 10);
+        //count = strtol(line, &line, 10);
+        return -1;
     }
+    //i- сам count, j - сдвиг строки относительно loop (l_index)
     int i,j;
     j = 1;
     for (i = 0; i < count; i++) {
-        int result = 0;
+        int result = 0; //ответ функции exec_l
         j = 1;
+        //какие строки будут выполняться в цикле loop
         while (result != -1) {
             result = exec_l(x, lines, (l_index + j++));
+            //loop в loop'е
             if (result > 0)
                 j = result - l_index;
         }
     }
-    return l_index + j;
+    return l_index + j; //вернет индекс строки после "end" -> передаст ей управление
 
 }
 //куда пошлем строку?
@@ -149,32 +160,35 @@ int exec_l(O_X * x, char ** lines, int l_index) {
         return -1;
 }
 
-void exec(char * input, char * output) {
+int exec(char * input, char * output) {
     O_X x;
+    x.x = malloc(sizeof(long long));
     x.length = 0;
 
     char ** lines = '\0';
 
     I_FILE file;
-    file.f = fopen(input, "r");
+    if (!(file.f = fopen(input, "r"))) {
+        fclose(file.f);
+        return 1;
+    }
     file.eof = 0;
     file.lines = 0;
     while (!file.eof) {
-
-        lines = realloc(lines, sizeof(lines) + 1000);
+        lines = realloc(lines, (file.lines + 1) * sizeof(char *));
         lines[file.lines] = readln(&file);
     }
     int i;
     for (i = 0; i < file.lines; i++) {
         int result = exec_l(&x, lines, i);
         if (result > 0)
-            i = result;
+            i = --result;
     }
     int j = 0;
     for (j = 0; j < x.length; j++)
         printf("x%i = %i\n", j, (int)x.x[j]);
-
-
+    fclose(file.f);
+    return 0;
 }
 
 

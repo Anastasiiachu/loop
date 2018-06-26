@@ -10,5 +10,5 @@ typedef struct _O_X {
     long int length;
 } O_X;
 
-void exec(char * input, char * output);
+int exec(char * input, char * output);
 int exec_l(O_X * x, char ** lines, int l_index);
