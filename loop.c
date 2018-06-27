@@ -24,14 +24,112 @@ char * readln(I_FILE * file) {
     file->lines++;
     return line;
 }
+
+void big_int_free(big_int * a) {
+    free(a->num);
+    free(a);
+}
+
+void refit(big_int * a) {
+    int n = 0;
+    for (int i = a->length - 1; i >= 0; i--) {
+        if (a->num[i] == 0)
+            n++;
+        else
+            break;
+    }
+    if (n > 0) {
+        a->length -= n;
+        a->num = realloc(a->num, sizeof(int) * a->length);
+    }
+
+}
+
+big_int * bfroml(long a) {
+    big_int * c = (big_int *)malloc(sizeof(big_int));
+    c->length = 19; //Длина long long
+    c->num = malloc(sizeof(int) * c->length);
+    for (int i = 0; i < c->length; i++)
+        c->num[i] = 0;
+    for (int i = 0; a > 0; i++) {
+        c->num[i] = (int)(a % 10);
+        a /= 10;
+    }
+    refit(c);
+    return c;
+}
+long long btol(big_int * a) {
+    long long result = 0;
+    for (int i = a->length - 1; i >= 0; i--) {
+        result *= 10;
+        result += a->num[i];
+    }
+    return result;
+}
+big_int * sum (big_int * a, big_int * b) {
+    if (a == 0)
+        a =  bfroml(0);
+    if (b == 0)
+        b =  bfroml(0);
+    big_int * c = (big_int *)malloc(sizeof(big_int));
+    c->length = ((a->length > b->length) ? (a->length + 1) : (b->length + 1));
+    c->num = malloc(sizeof(int) * c->length);
+    for (int i = 0; i < c->length; i++)
+        c->num[i] = 0; //начальная инициализация. Без нее какой-нибудь незначащий 0 может вдруг оказаться пятеркой
+    int shift = 0;
+    for (int i = 0; i < c->length; i++) {
+        int d_a = ((i >= a->length) ? 0 : (a->num[i]));
+        int d_b = ((i >= b->length) ? 0 : (b->num[i]));
+        int sum = d_a + d_b + shift;
+        if (sum > 9) {
+            c->num[i] = sum % 10;
+            shift = 1;
+        } else {
+            c->num[i] = sum;
+            shift = 0;
+        }
+    }
+    refit(c);
+    return c;
+}
+
+big_int * substract(big_int * a, big_int * b) {
+    if (a == 0)
+        a =  bfroml(0);
+    if (b == 0)
+        b =  bfroml(0);
+    big_int * c = (big_int *)malloc(sizeof(big_int));
+    c->length = ((a->length > b->length) ? (a->length) : (b->length));
+    c->num = malloc(sizeof(int) * c->length);
+    for (int i = 0; i < c->length; i++)
+        c->num[i] = 0;
+    int shift = 0;
+    for (int i = 0; i < c->length; i++) {
+        int d_a = ((i >= a->length) ? 0 : (a->num[i]));
+        int d_b = ((i >= b->length) ? 0 : (b->num[i]));
+        int sum = d_a - d_b + shift;
+        if (sum < 0 && i != (c->length - 1)) {
+            c->num[i] = sum + 10;
+            shift = -1;
+        } else {
+            c->num[i] = sum;
+            shift = 0;
+        }
+    }
+    if (c->num[c->length - 1] < 0)
+        for (int i = 0; i < c->length; i++)
+            c->num[i] = 0;
+    refit(c);
+    return c;
+}
+
 //выделение памяти под переменные
 void realloc_x(O_X * x, long int index) {
     if (x->length <= index) {
-        x->x = realloc(x->x, sizeof(long long) * (index + 1));
+        x->x = realloc(x->x, sizeof(big_int *) * (index + 1));
         long i;
-        for (i = x ->length; i <= index; i++) {
-            x -> x[i] = 0;
-        }
+        for (i = x->length; i <= index; i++)
+            x->x[i] = bfroml(0);
         x->length = index + 1;
     }
 }
@@ -45,11 +143,8 @@ int s_s(char * string, int from) {
     return -1;
 }
 //математические операции
-void math(O_X * x, char * _line) {
-
-    char * line = malloc(strlen(_line) * sizeof(char));
-    //копируем строку
-    strcpy(line, _line);
+void math(O_X * x, char * line) {
+    size_t length = strlen(line);
     line += s_s(line, 0);
     if (*line != 'x')
         return; //TODO вывести ошибку
@@ -63,7 +158,7 @@ void math(O_X * x, char * _line) {
     if (*(line)++ != ':' || *(line)++ != '=')
         return; //TODO вывести ошибку
     line++; //И опять сдвигаем указатель
-    long long value_a;
+    big_int * value_a;
     //Если это другая переменная
     if (*line == 'x') {
         line++;
@@ -74,17 +169,17 @@ void math(O_X * x, char * _line) {
             value_a = x->x[index_a];
     //Если константа
     } else {
-        value_a = strtol(line, &line, 10);
+        value_a = bfroml(strtol(line, &line, 10));
     }
-    long long value_b = 0;
-    int sum = 1; //по нему определяем какой знак операции
+    big_int * value_b = 0;
+    int sum_flag = 1; //по нему определяем какой знак операции
     //Выражение могло закончится всего на одном слагаемом, так что проверяем наличие второго
     if (*line != '\0' && *line != ';' && *line != '\r') {
         line++; //Да сколько можно их сдвигать?
         if (*line == '+') {
-            sum = 1;
+            sum_flag = 1;
         } else if (*line == '-') {
-            sum = -1;
+            sum_flag = -1;
         } else {
             return; //TODO вывести ошибку
         }
@@ -98,19 +193,25 @@ void math(O_X * x, char * _line) {
                 value_b = x->x[index_b];
             //Если константа
         } else {
-            value_b = strtol(line, &line, 10);
+            value_b = bfroml(strtol(line, &line, 10));
         }
     }
-    long long result = value_a + (value_b * sum);
-    if (result > 0)
-        x->x[index] = result;
-    else
-        x->x[index] = 0;
-    //free(line);
+    if (sum_flag == 1) {
+        big_int * old = x->x[index];
+        x->x[index] = sum(value_a, value_b);
+        //big_int_free(old);
+    } else {
+        big_int * old = x->x[index];
+        x->x[index] = substract(value_a, value_b);
+        //big_int_free(old);
+    }
+    line -= (length - strlen(line));
 }
 
 int loop(O_X * x, char ** lines, int l_index) {
-    char * line = malloc(strlen(lines[l_index]) * sizeof(char));
+    size_t length = strlen(lines[l_index]);
+    //char * line = malloc(strlen(lines[l_index]) * sizeof(char));
+    char * line = lines[l_index];
     strcpy(line, lines[l_index]);
     line += s_s(line, 0);
     //проверим слово loop
@@ -124,7 +225,7 @@ int loop(O_X * x, char ** lines, int l_index) {
         if (index >= x->length)
             count = 0; //Переменная не используется -> равна 0
         else
-            count = x->x[index]; //переменная была использована ранее, берем ее значение по индексу
+            count = btol(x->x[index]); //переменная была использована ранее, берем ее значение по индексу
         //Если константа (а может так нельзя)
     } else {
         //count = strtol(line, &line, 10);
@@ -144,6 +245,7 @@ int loop(O_X * x, char ** lines, int l_index) {
                 j = result - l_index;
         }
     }
+    line -= (length - strlen(line));
     return l_index + j; //вернет индекс строки после "end" -> передаст ей управление
 
 }
@@ -169,7 +271,7 @@ int exec(char * input, char * output) {
 
     I_FILE file;
     if (!(file.f = fopen(input, "r"))) {
-        fclose(file.f);
+        //fclose(file.f);
         return 1;
     }
     file.eof = 0;
@@ -184,11 +286,11 @@ int exec(char * input, char * output) {
         if (result > 0)
             i = --result;
     }
+    FILE * out = fopen(output, "w+");
     int j = 0;
     for (j = 0; j < x.length; j++)
-        printf("x%i = %i\n", j, (int)x.x[j]);
+        fprintf(out,"x%i = %lli\n", j, btol(x.x[j]));
+    fclose(out);
     fclose(file.f);
     return 0;
 }
-
-

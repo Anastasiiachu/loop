@@ -5,8 +5,13 @@ typedef struct _I_FILE {
     int eof;
 } I_FILE;
 
+typedef struct _big_int {
+    int * num;
+    int length;
+} big_int;
+
 typedef struct _O_X {
-    long long * x;
+    big_int ** x;
     long int length;
 } O_X;
 

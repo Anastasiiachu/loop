@@ -1,0 +1,8 @@
+x3 := x10 + 14
+LOOP x3 DO
+    x1 := x3 + 12
+    x2 := x2 + 7
+    LOOP x1 DO
+        x4 := x2 - 100
+    END
+END
